@@ -1,32 +1,53 @@
-from setuptools import setup
+# setup.py
+from pathlib import Path
+from setuptools import setup, find_packages
 
-with open("requirements.txt") as f:
-    requirements = f.read().splitlines()
+ROOT = Path(__file__).parent.resolve()
 
-with open("README.md") as readme_file:
-    readme = readme_file.read()
+# ---------------------------------------------------------------------- #
+#  Read long-description & install-requires directly from files
+# ---------------------------------------------------------------------- #
+readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
+requirements = (
+    (ROOT / "requirements.txt")
+    .read_text(encoding="utf-8")
+    .splitlines()
+)
+
+# ---------------------------------------------------------------------- #
+#  Package metadata
+# ---------------------------------------------------------------------- #
 setup(
-    name="fashion-clip",
+    name="find_my_vibe",
     version="0.2.2",
-    description="",
-    python_requires=">=3.5",
+    description="Multi-attribute fashion-image matcher (CLIP + Faiss)",
+    long_description=readme,
+    long_description_content_type="text/markdown",
+    author="Huijing Yi, Jingyi Chen, Chenxu Lan, Wenyue Zhu",
+    author_email=(
+        "yi.hu@northeastern.edu, "
+        "chen.jingyi6@northeastern.edu, "
+        "lan.che@northeastern.edu, "
+        "zhu.weny@northeastern.edu"
+    ),
+    license="MIT",
+    python_requires=">=3.9, <3.13",
     classifiers=[
-        "Development Status :: 2 - Pre-Alpha",
+        "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",
         "License :: OSI Approved :: MIT License",
         "Natural Language :: English",
-        "Programming Language :: Python :: 3.5",
-        "Programming Language :: Python :: 3.6",
-        "Programming Language :: Python :: 3.7",
-        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3 :: Only",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Topic :: Multimedia :: Graphics",
+        "Topic :: Scientific/Engineering :: Artificial Intelligence",
+        "Typing :: Typed",
     ],
-    author="Jacopo Tagliabue, Patrick John Chia, Federico Bianchi",
-    author_email="jtagliabue@coveo.com, pchia@coveo.com, f.bianchi@unibocconi.it",
-    license="MIT license",
-    long_description=readme,
-    long_description_content_type="text/markdown",
-    packages=["fashion_clip"],
+    packages=find_packages(exclude=("tests", "docs", "notebooks")),
     include_package_data=True,
     install_requires=requirements,
     zip_safe=False,

@@ -4,7 +4,7 @@ demo_find.py – CLI / notebook helper:
 prints 5-head prediction and shows the k matches
 """
 import argparse, pathlib, sys
-from recommend import recommend
+from backend.recommend import recommend
 from PIL import Image
 
 # ------------- CLI ----------------------------------------------------

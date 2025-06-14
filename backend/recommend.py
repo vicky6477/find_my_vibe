@@ -7,7 +7,7 @@ import numpy as np, faiss, pickle, torch
 from PIL import Image, ImageFile
 from pathlib import Path
 from transformers import CLIPModel, CLIPProcessor
-from train_fclip_multitask import FiveHead
+from backend.train_fclip_multitask import FiveHead
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True   # ignore bad JPG headers
 

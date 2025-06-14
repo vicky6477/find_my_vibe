@@ -1,220 +1,216 @@
-# FashionCLIP
+# 🧠 Find-My-Vibe
 
-[![Youtube Video](https://img.shields.io/badge/youtube-video-red)](https://www.youtube.com/watch?v=uqRSc-KSA1Y)
-[![HuggingFace Model](https://img.shields.io/badge/HF%20Model-Weights-yellow)](https://huggingface.co/patrickjohncyh/fashion-clip)
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1Z1hAxBnWjF76bEi9KQ6CMBBEmI_FVDrW?usp=sharing)
-[![Medium Blog Post](https://raw.githubusercontent.com/aleen42/badges/master/src/medium.svg)](https://towardsdatascience.com/teaching-clip-some-fashion-3005ac3fdcc3)
-[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://huggingface.co/spaces/vinid/fashion-clip-app)
-
-
-## Quick Start
-
-| Name            | Link     | 
-|-----------------|----------|
-| FashionCLIP Feature Extraction and Classification | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1Z1hAxBnWjF76bEi9KQ6CMBBEmI_FVDrW?usp=sharing)|
-| Tutorial -  FashionCLIP Evaluation with RecList | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1ek-TIT1ZJta59-O73GaXsOINvt46dnkz?usp=sharing)|
-
-
-UPDATE (10/03/23): We have updated the model! We found that [laion/CLIP-ViT-B-32-laion2B-s34B-b79K](https://huggingface.co/laion/CLIP-ViT-B-32-laion2B-s34B-b79K) checkpoint (thanks [Bin](https://www.linkedin.com/in/bin-duan-56205310/)!) worked better than original OpenAI CLIP on Fashion. We thus fine-tune a newer (and better!) version of FashionCLIP (henceforth FashionCLIP 2.0), while keeping the architecture the same. We postulate that the perofrmance gains afforded by `laion/CLIP-ViT-B-32-laion2B-s34B-b79K` are due to the increased training data (5x OpenAI CLIP data). Our [thesis](https://www.nature.com/articles/s41598-022-23052-9), however, remains the same -- fine-tuning `laion/CLIP` on our fashion dataset improved zero-shot perofrmance across our benchmarks. See the below table comparing weighted macro F1 score across models.
-`
-
-| Model             | FMNIST        | KAGL          | DEEP          | 
-| -------------     | ------------- | ------------- | ------------- |
-| OpenAI CLIP       | 0.66          | 0.63          | 0.45          |
-| FashionCLIP       | 0.74          | 0.67          | 0.48          |
-| Laion CLIP        | 0.78          | 0.71          | 0.58          |
-| FashionCLIP 2.0   | __0.83__          | __0.73__          | __0.62__          |
+*A practical demo that fine-tunes FashionCLIP, predicts five key fashion
+attributes, and returns the three catalogue items that best match a query
+image.*
 
 ---
 
-We are now on Hugging Face! The model is available [here](https://huggingface.co/patrickjohncyh/fashion-clip).
+### Contents
 
-We are now on [Nature Scientific Reports](https://www.nature.com/articles/s41598-022-23052-9)!
+- [🧠 Find-My-Vibe](#-find-my-vibe)
+    - [Contents](#contents)
+  - [Quick-start](#quick-start)
+  - [Overview](#overview)
+  - [Installation](#installation)
+  - [Build the Faiss index](#build-the-faiss-index)
+  - [CLI demo](#cli-demo)
+    - [Predicted attributes](#predicted-attributes)
+  - [REST API + UI](#rest-api--ui)
+    - [Endpoint](#endpoint)
+      - [Example Response `200 OK`](#example-response-200-ok)
+  - [Using the embeddings directly](#using-the-embeddings-directly)
+  - [What We Changed and Why](#what-we-changed-and-why)
+    - [✨ End-to-End Flow](#-end-to-end-flow)
+  - [Project layout](#project-layout)
+  - [Troubleshooting](#troubleshooting)
+  - [Citation](#citation)
 
-## Citation
+---
+
+## Quick-start
+
+```bash
+git clone https://github.com/<you>/find_my_vibe.git
+cd find_my_vibe
+
+# 1  create env + install wheels
+python3.11 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt          # numpy<2 • torch 2.2.2 • faiss-cpu 1.7.4 …
+
+# 2  one-time: build Faiss index (~8 min CPU, <3 min Apple-Silicon MPS)
+python -m backend.build_index
+
+# 3  run CLI grid
+python backend/demo_find.py uploads/example.jpg -k 3
+
+# 4  run API + front-end
+python main.py           # http://127.0.0.1:8000  /docs for Swagger
 ```
-@Article{Chia2022,
-    title="Contrastive language and vision learning of general fashion concepts",
-    author="Chia, Patrick John
-            and Attanasio, Giuseppe
-            and Bianchi, Federico
-            and Terragni, Silvia
-            and Magalh{\~a}es, Ana Rita
-            and Goncalves, Diogo
-            and Greco, Ciro
-            and Tagliabue, Jacopo",
-    journal="Scientific Reports",
-    year="2022",
-    month="Nov",
-    day="08",
-    volume="12",
-    number="1",
-    pages="18958",
-    abstract="The steady rise of online shopping goes hand in hand with the development of increasingly complex ML and NLP models. While most use cases are cast as specialized supervised learning problems, we argue that practitioners would greatly benefit from general and transferable representations of products. In this work, we build on recent developments in contrastive learning to train FashionCLIP, a CLIP-like model adapted for the fashion industry. We demonstrate the effectiveness of the representations learned by FashionCLIP with extensive tests across a variety of tasks, datasets and generalization probes. We argue that adaptations of large pre-trained models such as CLIP offer new perspectives in terms of scalability and sustainability for certain types of players in the industry. Finally, we detail the costs and environmental impact of training, and release the model weights and code as open source contribution to the community.",
-    issn="2045-2322",
-    doi="10.1038/s41598-022-23052-9",
-    url="https://doi.org/10.1038/s41598-022-23052-9"
-}
-```
-
-
-## Information 
-
-We are awaiting the official release of the Farfetch dataset, upon which fine-tuned model weights,
-pre-processed image and text vectors will be made public. In the meanwhile, we currently use the 
-[Hugging Face](https://huggingface.co/) implementation of `CLIP` and can use the model weights
-from [OpenAI](https://huggingface.co/openai/clip-vit-base-patch32) by following the standard hugginface 
-naming convention (i.e. `fclip = FashionCLIP('<username>/<repo_name>', ... )`). We also support private
-repositories (i.e. `fclip = FashionCLIP('<username>/<repo_name>', auth_token=<AUTH_TOKEN>, ... )`). 
-
-See below for further details!
 
 ## Overview
 
-`FashionCLIP` is a CLIP-like model fine-tuned for the fashion industry. We fine tune 
-`CLIP` ([Radford et al., 2021](https://www.nature.com/articles/s41598-022-23052-9) on over 700K 
-<image, text> pairs from the Farfetch dataset[^1].
+| Block        | Details                                                                                  |
+| ------------ | ---------------------------------------------------------------------------------------- |
+| Backbone     | patrickjohncyh/fashion-clip (ViT-B/32)                                                   |
+| Heads        | 5 linear layers trained on 31k catalogue imgs → item-type, gender, colour, season, style |
+| Hybrid score | 0.7 · CLIP cosine + 0.3 · style-propensity dot                                           |
+| Retrieval    | Faiss IndexFlatIP on L2-normed 512-D vectors                                             |
+| UI           | FastAPI backend + plain-HTML front-end                                                   |
 
-We evaluate FashionCLIP by applying it to open problems in industry such as retrieval, classification
-and fashion parsing. Our results demonstrate that fine-tuning helps capture domain-specific concepts 
-and generalizes them in zero-shot scenarios. We also supplement quantitative tests with qualitative analyses, 
-and offer preliminary insights into how concepts grounded in a visual space unlocks linguistic generalization. 
-Please see our [paper](https://www.nature.com/articles/s41598-022-23052-9) for more details.
+## Installation
 
-In this repository, you will find an API for interacting with `FashionCLIP` and an interactive demo built using [streamlit](https://streamlit.io/) (coming soon!) 
- which showcases the capabilities of `FashionCLIP`.
-
-
-[^1]: Pending official release.
-
-
-## API & Demo
-
-
-### Quick How To
-
-Need a quick way to generate embeddings? do you want to test retrieval performance? 
-
-First of all, you should be able to quickly install this using pip.
-
-```
-$ pip install fashion-clip 
+```bash
+python3.11 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
-If you have lists of texts and image paths, it is very easy to generate embeddings:
+> requirements.txt pins: numpy < 2 · torch 2.2.2 (cpu) · faiss-cpu 1.7.4 · transformers ≥ 4.52 + FastAPI runtime deps.
+
+## Build the Faiss index
+
+```bash
+python -m backend.build_index     # creates data/fclip_cosine.index (~80 MB)
+```
+
+Re-run only when you upgrade the Faiss wheel or add catalogue images.
+
+## CLI demo
+
+```bash
+python backend/demo_find.py uploads/dress.jpg -k 3
+```
+
+### Predicted attributes
+
+```
+ item_type : dress
+ gender    : women
+ colour    : white
+ season    : summer
+ style top-3: ethnic (14.3 %), casual (13.2 %), formal (11.0 %)
+```
+
+\[matplotlib grid with query + 3 matches]
+
+## REST API + UI
+
+Start server:
+
+```bash
+python main.py
+```
+
+Then visit: [http://127.0.0.1:8000](http://127.0.0.1:8000)
+
+### Endpoint
+
+`POST /predict/`
+
+* Content-Type: `multipart/form-data (file=jpg/png)`
+
+#### Example Response `200 OK`
+
+```json
+{
+  "prediction": {
+     "item_type": "tshirts",
+     "gender": "men",
+     "colour": "navy blue",
+     "season": "fall",
+     "style_top3": { "casual":0.88, "streetwear":0.08, "sports":0.03 }
+  },
+  "recommendations": [
+     "/fashion-dataset/50556.jpg",
+     "/fashion-dataset/50193.jpg",
+     "/fashion-dataset/17875.jpg"
+  ]
+}
+```
+
+The front-end demo (`frontend/index.html`) uploads an image and renders the
+attributes plus the three matches returned.
+
+## Using the embeddings directly
 
 ```python
-
+import numpy as np
 from fashion_clip.fashion_clip import FashionCLIP
 
 fclip = FashionCLIP('fashion-clip')
 
-# we create image embeddings and text embeddings
 image_embeddings = fclip.encode_images(images, batch_size=32)
-text_embeddings = fclip.encode_text(texts, batch_size=32)
+text_embeddings  = fclip.encode_text(texts,  batch_size=32)
 
-# we normalize the embeddings to unit norm (so that we can use dot product instead of cosine similarity to do comparisons)
-image_embeddings = image_embeddings/np.linalg.norm(image_embeddings, ord=2, axis=-1, keepdims=True)
-text_embeddings = text_embeddings/np.linalg.norm(text_embeddings, ord=2, axis=-1, keepdims=True)
+# L2-norm so dot == cosine
+image_embeddings /= np.linalg.norm(image_embeddings, axis=-1, keepdims=True)
+text_embeddings  /= np.linalg.norm(text_embeddings,  axis=-1, keepdims=True)
+
+similarity = image_embeddings @ text_embeddings.T   # (n_img × n_txt)
 ```
 
-**Use our [colab](https://colab.research.google.com/drive/1Z1hAxBnWjF76bEi9KQ6CMBBEmI_FVDrW?usp=sharing)** notebook to see more functionalities.
+This is exactly how `backend/build_index.py` prepares vectors for Faiss.
 
+## What We Changed and Why
 
-### HF API
+| Stage                    | What we added / changed                                                                                                                                    | Why it matters                                                   | Key file(s)                                       |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------- |
+| 1. Fine-tune FashionCLIP | Added `train_fclip_multitask.py` to load HuggingFace ViT-B/32, add 5 heads (style, item\_type, gender, colour, season), train only heads (freeze backbone) | Allows single forward pass to predict 5 fashion attributes       | backend/train\_fclip\_multitask.py                |
+| 2. Embedding + indexing  | `build_index.py` embeds \~40k images, predicts soft style, stores 512-D vector and meta in Faiss + pickle                                                  | Efficient searchable index with full attribute metadata          | backend/build\_index.py, data/*.pkl, data/*.index |
+| 3. Hybrid retrieval      | `recommend.py` combines CLIP vector similarity + soft style score, filters mismatched types                                                             | Improves accuracy by ensuring style and semantics both match     | backend/recommend\.py                          |
+| 4. CLI visualisation     | `demo_find.py` shows predicted attributes + matplotlib grid or fallback to terminal paths                                                                  | Quick way to sanity-check output visually                        | backend/demo\_find.py                             |
+| 5. FastAPI service       | `api.py`, `main.py`, and `index.html` power RESTful interface and upload UI                                                                                | Microservice + interactive preview without external dependencies | backend/api.py, frontend/index.html               |
+| 6. Cross-platform fixes  | POSIX paths, pinned versions, libomp segfault fix, KMP warning fix                                                                                         | Ensures reproducibility across macOS/Linux/WSL                   | requirements.txt, recommend\.py                |
 
-```python
-
-from PIL import Image
-import requests
-from transformers import CLIPProcessor, CLIPModel
-
-model = CLIPModel.from_pretrained("patrickjohncyh/fashion-clip")
-processor = CLIPProcessor.from_pretrained("patrickjohncyh/fashion-clip")
-
-image = Image.open("images/image1.jpg")
-
-inputs = processor(text=["a photo of a red shoe", "a photo of a black shoe"],
-                   images=image, return_tensors="pt", padding=True)
-
-outputs = model(**inputs)
-logits_per_image = outputs.logits_per_image  # this is the image-text similarity score
-probs = logits_per_image.softmax(dim=1)  
-print(probs)
-image.resize((224, 224))
-```
-
-### Additional Internal FashionCLIP API
-
-#### Installation
-From project root, install the `fashion-clip` package locally with 
-```
-$ pip install -e . 
-```
-
-
-There are two main abstractions to facilitate easy use of `FashionCLIP`.
-
-First, the __`FCLIPDataset`__ class which encapsulates information related to a given catalog
-and exposes information critical for `FashionCLIP`. Additionally, it provides helper functions
-for quick exploration and visualization of data. The main initialization parameters are
+### ✨ End-to-End Flow
 
 ```
-name: str -> Name of dataset
-image_source_path: str -> absolute path to images (can be local or s3) 
-image_source_type: str -> type of source (i.e. local or s3)
-catalog: List[dict] = None -> list of dicts containing at miniumum the keys ['id', 'image', 'caption']
+upload JPG  ──▶ FastAPI ──▶ recommend.py
+                                │
+             (backbone+heads)   │ (Faiss IP search)
+             CLIP 512-D vector  │
+             5-head probs       ▼
+               + labels     top-3 catalogue images
+                 ▲    ▲            ▲
+                 └─────┘────────┘
+           JSON  {attributes + /fashion-dataset/img.jpg}
 ```
 
-For ease of use, the API also provides access to the dataset (_once it is officialy released_), used in the paper 
-for training `FahionCLIP`, by simply specifying the corresponding catalog name.
-
-#### Pre-Included Dataset
-```
-from fashion_clip import FCLIPDataset
-dataset = FCLIPDataset(name='FF', 
-                       image_source_path='path/to/images', 
-                       image_source_type='local')
-```
-
-#### Custom dataset
+## Project layout
 
 ```
-from fashion_clip import FCLIPDataset
-my_catalog = [{'id': 1, 'image': 'x.jpg', 'caption': 'image x'}]
-dataset = FCLIPDataset(name='my_dataset', 
-                       image_source_path='path/to/images', 
-                       image_source_type='local',
-                       catalog=my_catalog)
+backend/
+├─ train_fclip_multitask.py    # fine-tune 5 heads
+├─ build_index.py              # embed + index catalogue
+├─ recommend.py             # hybrid matcher
+├─ api.py                      # FastAPI app
+demo_find.py                # CLI visualizer
+main.py                        # server entry
+frontend/index.html            # upload UI
+data/                          # index & metadata live here
+uploads/                       # user uploads land here
 ```
 
-The second abstraction is the __`FashionCLIP`__ class, which takes in a Hugging Face CLIP model name and 
-an `FCLIPDataset`, and provides convenient functions to perform tasks such as multi-modal retrieval, 
-zero-shot classification and localization. The initialization parameters for `FashionCLIP` are as follows:
+## Troubleshooting
 
-```
-model_name: str -> Name of model OR path to local model
-dataset: FCLIPDataset -> Dataset, 
-normalize: bool -> option to convert embeddings to unit norm  
-approx: bool -> option to use approximate nearest neighbors
-```
+| Symptom                       | Fix                                                                           |
+| ----------------------------- | ----------------------------------------------------------------------------- |
+| Seg-fault during build\_index | Use wheels in requirements.txt; delete old data/fclip\_cosine.index; rebuild. |
+| Thumbnails 404                | Make sure api.py returns /fashion-dataset/{basename} URLs.                    |
+| NumPy 2 ImportError           | `pip install "numpy<2"` – Faiss wheels target NumPy-1 ABI.                    |
 
-Similar to the `FCLIPDataset` abstraction, we have included a pre-trained `FashionCLIP` model from the paper, hosted
-[here](https://huggingface.co/patrickjohncyh/fashion-clip). If an unknown dataset and model combination is received, 
-the image and caption vectors will be generated upon object instantiation, otherwise pre-computed vectors/embeddings will 
-be pulled from S3.
+## Citation
 
-```
-from fashion_clip import FCLIPDataset, FashionCLIP
-dataset = FCLIPDataset(name='FF', 
-                       image_source_path='path/to/images', 
-                       image_source_type='local')
-fclip = FashionCLIP('fasihon-clip', ff_dataset)
+FashionCLIP: https://github.com/patrickjohncyh/fashion-clip
+
+```bibtex
+@Article{Chia2022,
+  title   = "Contrastive language and vision learning of general fashion concepts",
+  journal = "Scientific Reports",
+  year    = "2022",
+  author  = "Patrick John Chia et al.",
+  doi     = "10.1038/s41598-022-23052-9"
+}
 ```
 
-For further details on how to use the package, refer to the accompanying notebook!
-
-## Fun Related Projects!
-
-* Check [RustEmbed](https://github.com/yaman/RustEmbed) for an application to use gRPC to create embeddings with FashionCLIP.
-
+MIT License © Huijing Yi · Jingyi Chen · Chenxu Lan · Wenyue Zhu
