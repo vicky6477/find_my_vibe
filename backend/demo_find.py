@@ -4,7 +4,7 @@ demo_find.py – CLI / notebook helper:
 prints 5-head prediction and shows the k matches
 """
 import argparse, pathlib, sys
-from recommend_v2 import recommend
+from recommend import recommend
 from PIL import Image
 
 # ------------- CLI ----------------------------------------------------
@@ -15,7 +15,7 @@ args = p.parse_args()
 
 query = pathlib.Path(args.image)
 if not query.exists():
-    sys.exit(f"❌  file not found: {query}")
+    sys.exit(f"file not found: {query}")
 
 matches, attrs = recommend(str(query), k=args.k, return_attrs=True)
 
@@ -45,6 +45,8 @@ try:
 
     for i,p in enumerate(matches, start=2):
         plt.subplot(nrows+1, ncols, i)
+        print(matches)
+        print(p)
         plt.imshow(Image.open(p))
         plt.title(pathlib.Path(p).name, fontsize=7)
         plt.axis("off")
