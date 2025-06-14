@@ -4,11 +4,16 @@
 attributes, and returns the three catalogue items that best match a query
 image.*
 
+## Dataset
+
+This project uses the [Fashion Product Images (Small)](https://www.kaggle.com/datasets/paramaggarwal/fashion-product-images-small) dataset from Kaggle.
 ---
 
 ### Contents
 
 - [🧠 Find-My-Vibe](#-find-my-vibe)
+  - [Dataset](#dataset)
+  - [This project uses the Fashion Product Images (Small) dataset from Kaggle.](#this-project-uses-the-fashion-product-images-small-dataset-from-kaggle)
     - [Contents](#contents)
   - [Quick-start](#quick-start)
   - [Overview](#overview)
