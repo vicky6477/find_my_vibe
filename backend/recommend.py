@@ -1,103 +1,110 @@
-import os
-import json
-import numpy as np
-from backend.fashion_clip import FashionCLIP
-import pandas as pd
+import torch, os
+os.environ["OMP_NUM_THREADS"] = "1"        # avoid libomp pool
+torch.set_num_threads(1)
+torch.backends.mkldnn.enabled = False      # <- critical
 
-# Initialize the model
-fclip = FashionCLIP('patrickjohncyh/fashion-clip')
+import numpy as np, faiss, pickle, torch
+from PIL import Image, ImageFile
+from pathlib import Path
+from transformers import CLIPModel, CLIPProcessor
+from backend.train_fclip_multitask import FiveHead
 
-# Style prompts
-style_prompts = {
-    'Minimalist': ['simple modern outfit', 'minimalist fashion'],
-    'Sporty': ['athletic wear', 'sportswear with sneakers'],
-    'Retro': ['vintage clothing', 'old-fashioned fashion'],
-    'Elegant': ['elegant dress', 'classic formal outfit'],
-    'Streetwear': ['urban street fashion', 'hoodie and sneakers'],
-    'Formal': ['business suit', 'formal wear for work']
-}
-style_names = list(style_prompts.keys())
-style_texts = [desc for lst in style_prompts.values() for desc in lst]
+ImageFile.LOAD_TRUNCATED_IMAGES = True   # ignore bad JPG headers
 
-# Style embeddings
-style_embeddings = fclip.encode_text(style_texts, batch_size=8)
-style_embeddings = style_embeddings / np.linalg.norm(style_embeddings, axis=1, keepdims=True)
+# ---------- 0. load models + index once ---------------------------------
+CKPT   = Path("checkpoints/fclip_heads_5way.pth")
+INDEX  = Path("data/fclip_cosine.index")
+META   = Path("data/fclip_meta.pkl")
 
+ckpt  = torch.load(CKPT, map_location="cpu")
+backbone  = CLIPModel.from_pretrained(ckpt["fclip_id"])
+processor = CLIPProcessor.from_pretrained(ckpt["fclip_id"])
+heads = FiveHead(backbone.config.projection_dim,
+                 len(ckpt["styles"]), len(ckpt["items"]),
+                 len(ckpt["genders"]), len(ckpt["colours"]),
+                 len(ckpt["seasons"]))
+heads.load_state_dict(ckpt["heads"])
+heads.eval()
+backbone.eval()
 
-# Load Kaggle metadata
-STYLE_CSV = 'fashion_dataset/styles.csv'
-IMAGE_DIR = 'fashion_dataset/images'
-DB_PATH = 'data/fashion_db.json'
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+backbone.to(DEVICE); heads.to(DEVICE)
 
-def load_style_dataframe():
-    df = pd.read_csv(STYLE_CSV, on_bad_lines='skip')
-    df = df.dropna(subset=['articleType'])
-    df['id'] = df['id'].astype(str)
-    return df
+index = faiss.read_index(str(INDEX))
+meta  = pickle.load(open(META, "rb"))
 
-df = load_style_dataframe()
-LABELS = sorted(df['articleType'].str.lower().value_counts().head(20).index.tolist())
-
+# ---------- helpers -----------------------------------------------------
+def _hybrid(q_vec, q_style, c_vec, c_style, alpha=0.7):
+    return alpha * np.dot(q_vec, c_vec) + (1 - alpha) * np.dot(q_style, c_style)
 
 
-def build_database(limit=5):
-    df = load_style_dataframe()
+# ---------- public API --------------------------------------------------
+def recommend(img_path: str | Path, k: int = 5, return_attrs: bool = False):
+    """
+    Parameters
+    ----------
+    img_path : path to query image
+    k        : number of matches
+    return_attrs : if True → also return dict with 5-head prediction
 
-    database = []
-    for i, (_, row) in enumerate(df.iterrows()):
-        if i >= limit:
-            break
+    Returns
+    -------
+    list[str]             (if return_attrs=False)
+    (list[str], dict)     (if return_attrs=True)
+    """
+    img = Image.open(img_path).convert("RGB")
+    pix = processor(images=img, return_tensors="pt")["pixel_values"].to(DEVICE)
+
+    with torch.inference_mode():
+        feat = backbone.get_image_features(pix)       
+        feat = feat / feat.norm(p=2, dim=-1, keepdim=True)
+        style_probs = torch.softmax(heads.h_style(feat), dim=-1).cpu().squeeze().numpy()
+
+        item_logits = heads.h_item(feat)
+        item_probs = torch.softmax(item_logits, dim=-1).cpu().squeeze().numpy()
+        item_idx = item_probs.argmax()
+        item_conf = float(item_probs[item_idx]) 
         
-        image_path = os.path.join(IMAGE_DIR, row['id'] + '.jpg')
-        if not os.path.exists(image_path):
-            continue
-
-        try:
-            img_emb = fclip.encode_images([image_path], batch_size=1)[0]
-            img_emb = img_emb / np.linalg.norm(img_emb)
-        except:
-            continue
-
-        sims = np.dot(style_embeddings, img_emb)
-        grouped = sims.reshape(len(style_names), -1).mean(axis=1)
-        best_style = style_names[np.argmax(grouped)]
-
-        database.append({
-            "path": image_path,
-            "embedding": img_emb.tolist(),
-            "style": best_style,
-            "item_type": row['articleType'].lower()
-        })
-
-    os.makedirs("data", exist_ok=True)
-    with open(DB_PATH, 'w') as f:
-        json.dump(database, f, indent=2)
-
         
-def classify_item_type(image_path):
-    """Use zero-shot to classify input image to one of the common articleTypes."""
-    result = fclip.zero_shot_classification([image_path], LABELS)
-    return result[0] if result else 'unknown'
+        gender_idx = torch.softmax(heads.h_gender(feat), dim=-1).argmax().item()
+        colour_idx = torch.softmax(heads.h_colour(feat), dim=-1).argmax().item()
+        season_idx = torch.softmax(heads.h_season(feat), dim=-1).argmax().item()
 
-def recommend(image_path, top_k=5):
-    with open(DB_PATH, 'r') as f:
-        database = json.load(f)
+    q_vec  = feat.cpu().numpy()[0]
+    q_item = ckpt["items"  ][item_idx]
+    q_gender = ckpt["genders"][gender_idx]
+    q_colour = ckpt["colours"][colour_idx]
+    q_season = ckpt["seasons"][season_idx]
 
-    img_emb = fclip.encode_images([image_path], batch_size=1)[0]
-    img_emb = img_emb / np.linalg.norm(img_emb)
+    print(">>> Predict:", q_item, "confidence:", item_conf)
+     
+    # hard filter
+    cand_ids = [i for i,(p,g,it,c,s,_) in enumerate(meta)
+                if g==q_gender and it==q_item and c==q_colour and s==q_season]
+    if not cand_ids:
+        cand_ids = [i for i,(p,g,it,_,_,_) in enumerate(meta)
+                    if g==q_gender and it==q_item]
 
-    sims = np.dot(style_embeddings, img_emb)
-    grouped = sims.reshape(len(style_names), -1).mean(axis=1)
-    predicted_style = style_names[np.argmax(grouped)]
+    cand_vecs = index.reconstruct_n(0, index.ntotal)[cand_ids]
+    cand_meta = [meta[i] for i in cand_ids]
 
-    item_type = classify_item_type(image_path)
-    same_style_items = [d for d in database if d['style'] == predicted_style and d['item_type'] == item_type]
+    scores = [_hybrid(q_vec, style_probs, v, m[-1]) for v,m in zip(cand_vecs,cand_meta)]
+    topk   = np.argsort(scores)[::-1][:k]
+    matches = [cand_meta[i][0] for i in topk]
 
-    if not same_style_items:
-        return [], predicted_style, item_type
+    if not return_attrs:
+        return matches
 
-    embs = np.array([d['embedding'] for d in same_style_items])
-    sim_scores = np.dot(embs, img_emb)
-    top_idx = sim_scores.argsort()[-top_k:][::-1]
-    return [same_style_items[i]['path'] for i in top_idx], predicted_style, item_type
+    # package attribute dict
+    top3 = style_probs.argsort()[::-1][:3]
+    attr = {
+        "style_top3": {ckpt["styles"][i]: float(style_probs[i]) for i in top3},
+        "item_type" : q_item,
+        "item_confidence": item_conf, 
+        "gender"    : q_gender,
+        "colour"    : q_colour,
+        "season"    : q_season,
+    }
+    matches = [m.replace("\\", "/") for m in matches]  
 
+    return matches, attr
