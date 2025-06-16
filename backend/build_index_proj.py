@@ -11,8 +11,11 @@ from backend.train_proj_head import ProjHead
 
 
 # ▸ ▸ ▸ EDIT THESE PATHS IF YOUR TREE DIFFERS ◂ ◂ ◂
-CKPT_HEAD = Path("checkpoints/projection_head_256.pth")
-IMDIR     = Path("our_dataset/fashion_images")
+CKPT_HEAD = Path("checkpoints/proj_head_256.pth")
+IMG_DIRS = [
+    Path("fashion_dataset/images"),
+    Path("our_dataset/fashion_images")
+]
 OUT_VEC   = Path("data/fclip_triplet.index")
 META      = Path("data/fclip_triplet_meta.pkl")
 
@@ -31,7 +34,11 @@ clip.to(DEVICE); head.to(DEVICE)
 print("device:", DEVICE)
 
 # ----------- 2.  Collect all image paths -----------------------------
-paths = sorted(IMDIR.rglob("*.jpg")) + sorted(IMDIR.rglob("*.png"))
+paths = []
+for root in IMG_DIRS:
+    paths += sorted(root.rglob("*.jpg"))
+    paths += sorted(root.rglob("*.png"))
+
 assert paths, f"No images under {IMDIR}"
 print("images:", len(paths))
 
@@ -46,11 +53,11 @@ for s in range(0, len(paths), BATCH):
     pix  = proc(images=imgs, return_tensors="pt", padding=True
                 )["pixel_values"].to(DEVICE)
 
-    t0 = time.time()
+  
     with torch.inference_mode():
         feat = clip.get_image_features(pixel_values=pix)          # (B,512)
         proj = head(feat).cpu().numpy()                           # (B,256)
-    print("first batch elapsed:", time.time()-t0, "s")
+ 
 
     vecs.append(proj.astype("float32"))
     meta.extend([p.as_posix() for p in batch_paths])

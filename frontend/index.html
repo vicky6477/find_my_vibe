@@ -4,15 +4,50 @@
   <meta charset="UTF-8" />
   <title>Find My Vibe – demo</title>
   <style>
-    body{font-family:sans-serif;margin:40px;background:#f9f9f9}
-    h1{color:#333}
-    .upload-box{padding:20px;background:#fff;border:1px solid #ccc;border-radius:8px;width:400px}
-    #preview{margin-top:10px;max-width:100%;max-height:300px;border:1px solid #ddd}
-    #results{margin-top:30px}
-    .rec{display:inline-block;margin:10px;text-align:center}
-    .rec img{width:150px;height:150px;object-fit:cover;border:2px solid #ccc;border-radius:4px}
-    .attr{font-weight:bold;margin:2px 0}
-    .error{color:red;font-weight:bold}
+    body {
+      font-family: sans-serif;
+      margin: 40px;
+      background: #f9f9f9;
+    }
+    h1 {
+      color: #333;
+    }
+    .upload-box {
+      padding: 20px;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      width: 400px;
+    }
+    #preview {
+      margin-top: 10px;
+      max-width: 100%;
+      max-height: 300px;
+      border: 1px solid #ddd;
+    }
+    #results {
+      margin-top: 30px;
+    }
+    .rec {
+      display: inline-block;
+      margin: 10px;
+      text-align: center;
+    }
+    .rec img {
+      width: 150px;
+      height: 150px;
+      object-fit: cover;
+      border: 2px solid #ccc;
+      border-radius: 4px;
+    }
+    .attr {
+      font-weight: bold;
+      margin: 2px 0;
+    }
+    .error {
+      color: red;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
@@ -21,7 +56,21 @@
   <div class="upload-box">
     <form id="uploadForm">
       <label>Select a fashion image:</label><br/>
-      <input type="file" id="imageInput" name="file" accept="image/*" required/><br/>
+      <input type="file" id="imageInput" accept="image/*" required /><br/>
+
+      <!-- Retrieval mode selector -->
+      <fieldset style="margin-top:10px">
+        <legend>Retrieval mode</legend>
+        <label>
+          <input type="radio" name="mode" value="fivehead" checked />
+          Same-item (strict)
+        </label><br/>
+        <label>
+          <input type="radio" name="mode" value="combo" />
+          Style-combo (mix & match)
+        </label>
+      </fieldset>
+
       <img id="preview" style="display:none"/><br/>
       <button type="submit">Submit</button>
     </form>
@@ -29,49 +78,103 @@
 
   <div id="results"></div>
 
-<script>
-const imgInput = document.getElementById("imageInput");
-const preview  = document.getElementById("preview");
+  <script>
+    const imgInput = document.getElementById("imageInput");
+    const preview = document.getElementById("preview");
 
-imgInput.onchange = () => {
-  const f = imgInput.files[0];
-  if(!f) return;
-  const r = new FileReader();
-  r.onload = e => { preview.src=e.target.result; preview.style.display="block"; };
-  r.readAsDataURL(f);
-};
+    // Variables to store uploaded file information
+    let cachedFileBlob = null;      // Image as a DataURL (Base64)
+    let cachedFileName = null;      // Original file name
+    let cachedFileType = null;      // MIME type (e.g., image/jpeg)
 
-document.getElementById("uploadForm").addEventListener("submit", async e=>{
-  e.preventDefault();
-  const fd = new FormData(); fd.append("file", imgInput.files[0]);
+    // Handle file upload and preview
+    imgInput.onchange = () => {
+      const f = imgInput.files[0];
+      if (!f) return;
 
-  const box = document.getElementById("results");
-  box.innerHTML = "<p>Processing…</p>";
+      cachedFileName = f.name;
+      cachedFileType = f.type;
 
-  try{
-    const res = await fetch("/predict/", {method:"POST", body:fd});
-    if(!res.ok) throw new Error("Server error");
-    const data = await res.json();
+      const reader = new FileReader();
+      reader.onload = e => {
+        cachedFileBlob = e.target.result;  // Store image data
+        preview.src = cachedFileBlob;
+        preview.style.display = "block";
+      };
+      reader.readAsDataURL(f);
+    };
 
-    const attr = data.prediction;
-    const styleLines = Object.entries(attr.style_top3)
-          .map(([s,p])=>`${s} (${(p*100).toFixed(1)}%)`).join(', ');
-    const recHTML = data.recommendations.map(
-        u=>`<div class="rec"><img src="${u}"/></div>`).join('');
+    // Convert DataURL back to a File object
+    function dataURLToFile(dataURL, filename, mimeType) {
+      const byteString = atob(dataURL.split(',')[1]);
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i);
+      }
+      return new File([ab], filename, { type: mimeType });
+    }
 
-    box.innerHTML = `
-      <div class="attr">👜 Item type : ${attr.item_type}</div>
-      <div class="attr">🚻 Gender    : ${attr.gender}</div>
-      <div class="attr">🎨 Colour    : ${attr.colour}</div>
-      <div class="attr">🌦 Season    : ${attr.season}</div>
-      <div class="attr">✨ Style top-3: ${styleLines}</div>
-      <h3>Recommended items:</h3>
-      ${recHTML || '<p class="error">No matches found.</p>'}
-    `;
-  }catch(err){
-    box.innerHTML = `<p class="error">Error: ${err.message}</p>`;
-  }
-});
-</script>
+    // Handle form submission
+    document.getElementById("uploadForm").addEventListener("submit", async e => {
+      e.preventDefault();
+
+      // Check if image is uploaded
+      if (!cachedFileBlob || !cachedFileName || !cachedFileType) {
+        alert("Please upload a fashion item image first.");
+        return;
+      }
+
+      // Get selected retrieval mode
+      const mode = document.querySelector("input[name='mode']:checked").value;
+
+      // Convert cached DataURL back to File
+      const fileToUpload = dataURLToFile(cachedFileBlob, cachedFileName, cachedFileType);
+      const fd = new FormData();
+      fd.append("file", fileToUpload);
+
+      const box = document.getElementById("results");
+      box.innerHTML = "<p>Processing…</p>";
+
+      try {
+        // Send POST request with mode and image
+        const res = await fetch(`/predict/?mode=${mode}&k=3`, {
+          method: "POST",
+          body: fd
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          alert("Upload a fashion item: " + err.detail);
+          return;
+        }
+
+        // Parse JSON result
+        const data = await res.json();
+        const attr = data.prediction;
+
+        // Format style predictions
+        const styleLines = Object.entries(attr.style_top3)
+          .map(([s, p]) => `${s} (${(p * 100).toFixed(1)}%)`).join(', ');
+
+        // Format recommended images
+        const recHTML = data.recommendations.map(
+          u => `<div class="rec"><img src="${u}"/></div>`).join('');
+
+        // Render results
+        box.innerHTML = `
+          <div class="attr">👜 Item type : ${attr.item_type}</div>
+          <div class="attr">🚻 Gender    : ${attr.gender}</div>
+          <div class="attr">🎨 Colour    : ${attr.colour}</div>
+          <div class="attr">🌦 Season    : ${attr.season}</div>
+          <div class="attr">✨ Style top-3: ${styleLines}</div>
+          <h3>Recommended items:</h3>
+          ${recHTML || '<p class="error">No matches found.</p>'}
+        `;
+      } catch (err) {
+        box.innerHTML = `<p class="error">Error: ${err.message}</p>`;
+      }
+    });
+  </script>
 </body>
 </html>

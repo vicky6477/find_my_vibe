@@ -6,14 +6,18 @@
 import pathlib, pickle, time, numpy as np, faiss, torch
 from tqdm import tqdm
 from PIL import Image
+from pathlib import Path
 from transformers import CLIPModel, CLIPProcessor
 from backend.train_fclip_multitask import FiveHead
 
 # ▸ ▸ ▸ EDIT THESE PATHS IF YOUR TREE DIFFERS ◂ ◂ ◂
-CKPT_PATH = pathlib.Path("checkpoints/fclip_heads_5way_sub.pth")
-IMG_ROOT  = pathlib.Path("fashion_dataset/images")
-INDEX_OUT = pathlib.Path("data/fclip_cosine.index")
-META_OUT  = pathlib.Path("data/fclip_meta.pkl")
+CKPT_PATH = Path("checkpoints/fclip_heads_5way.pth")
+IMG_DIRS = [
+    Path("fashion_dataset/images"),
+    Path("our_dataset/fashion_images")
+]
+INDEX_OUT = Path("data/fclip_cosine.index")
+META_OUT  = Path("data/fclip_meta.pkl")
 
 # ---------- 1.  Load checkpoint, backbone, processor, heads ----------
 print("• Loading checkpoint …")
@@ -34,7 +38,11 @@ backbone.to(DEVICE); heads.to(DEVICE)
 print(f"• Device: {DEVICE}, proj_dim={backbone.config.projection_dim}")
 
 # ----------- 2.  Collect all image paths -----------------------------
-paths = sorted(IMG_ROOT.rglob("*.jpg")) + sorted(IMG_ROOT.rglob("*.png"))
+paths = []
+for root in IMG_DIRS:
+    paths += sorted(root.rglob("*.jpg"))
+    paths += sorted(root.rglob("*.png"))
+    
 assert paths, f"No images found under {IMG_ROOT}"
 print(f"• Images found: {len(paths):,}")
 

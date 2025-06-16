@@ -90,15 +90,18 @@ def recommend_combo(img_path: str | Path, k: int = 3, n: int = 1000):
 
         style_q = torch.softmax(five_head.h_style(feat512), dim=-1).cpu().squeeze().numpy()
         g_q = ckpt["genders"][torch.softmax(five_head.h_gender(feat512), dim=-1).argmax()]
-        i_q = ckpt["items"  ][torch.softmax(five_head.h_item  (feat512), dim=-1).argmax()]
+        item_probs = torch.softmax(five_head.h_item(feat512), dim=-1).cpu().squeeze().numpy()
+        item_idx = item_probs.argmax()
+        i_q = ckpt["items"][item_idx]
+        item_conf = float(item_probs[item_idx])
+
         c_q = ckpt["colours"][torch.softmax(five_head.h_colour(feat512), dim=-1).argmax()]
         s_q = ckpt["seasons"][torch.softmax(five_head.h_season(feat512), dim=-1).argmax()]
 
     # 4. layered filtering – colour kept for first two levels
     rules = [
-        lambda m: m[1] == g_q and m[2] == i_q and m[3] == c_q and m[4] == s_q,
-        lambda m: m[1] == g_q and m[2] == i_q and m[3] == c_q,
-        lambda m: m[1] == g_q and m[2] == i_q,
+        lambda m: m[1] == g_q and m[3] == c_q, 
+        lambda m: m[1] == g_q, 
         lambda m: True
     ]
     for rule in rules:
@@ -126,6 +129,7 @@ def recommend_combo(img_path: str | Path, k: int = 3, n: int = 1000):
         "gender"    : g_q,
         "colour"    : c_q,
         "season"    : s_q,
+        "item_confidence": item_conf,
         "style_top3": {ckpt["styles"][j]: float(style_q[j]) for j in top3_idx}
     }
     return paths, attrs

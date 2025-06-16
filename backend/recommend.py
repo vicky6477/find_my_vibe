@@ -37,6 +37,7 @@ meta  = pickle.load(open(META, "rb"))
 def _hybrid(q_vec, q_style, c_vec, c_style, alpha=0.7):
     return alpha * np.dot(q_vec, c_vec) + (1 - alpha) * np.dot(q_style, c_style)
 
+
 # ---------- public API --------------------------------------------------
 def recommend(img_path: str | Path, k: int = 5, return_attrs: bool = False):
     """
@@ -55,11 +56,16 @@ def recommend(img_path: str | Path, k: int = 5, return_attrs: bool = False):
     pix = processor(images=img, return_tensors="pt")["pixel_values"].to(DEVICE)
 
     with torch.inference_mode():
-        feat = backbone.get_image_features(pix)        # (1,512)
+        feat = backbone.get_image_features(pix)       
         feat = feat / feat.norm(p=2, dim=-1, keepdim=True)
         style_probs = torch.softmax(heads.h_style(feat), dim=-1).cpu().squeeze().numpy()
 
-        item_idx   = torch.softmax(heads.h_item  (feat), dim=-1).argmax().item()
+        item_logits = heads.h_item(feat)
+        item_probs = torch.softmax(item_logits, dim=-1).cpu().squeeze().numpy()
+        item_idx = item_probs.argmax()
+        item_conf = float(item_probs[item_idx]) 
+        
+        
         gender_idx = torch.softmax(heads.h_gender(feat), dim=-1).argmax().item()
         colour_idx = torch.softmax(heads.h_colour(feat), dim=-1).argmax().item()
         season_idx = torch.softmax(heads.h_season(feat), dim=-1).argmax().item()
@@ -70,6 +76,8 @@ def recommend(img_path: str | Path, k: int = 5, return_attrs: bool = False):
     q_colour = ckpt["colours"][colour_idx]
     q_season = ckpt["seasons"][season_idx]
 
+    print(">>> Predict:", q_item, "confidence:", item_conf)
+     
     # hard filter
     cand_ids = [i for i,(p,g,it,c,s,_) in enumerate(meta)
                 if g==q_gender and it==q_item and c==q_colour and s==q_season]
@@ -92,6 +100,7 @@ def recommend(img_path: str | Path, k: int = 5, return_attrs: bool = False):
     attr = {
         "style_top3": {ckpt["styles"][i]: float(style_probs[i]) for i in top3},
         "item_type" : q_item,
+        "item_confidence": item_conf, 
         "gender"    : q_gender,
         "colour"    : q_colour,
         "season"    : q_season,
