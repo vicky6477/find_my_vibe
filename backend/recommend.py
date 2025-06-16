@@ -96,6 +96,6 @@ def recommend(img_path: str | Path, k: int = 5, return_attrs: bool = False):
         "colour"    : q_colour,
         "season"    : q_season,
     }
-    matches = [m.replace("\\", "/") for m in matches]   # ← add this
+    matches = [m.replace("\\", "/") for m in matches]  
 
     return matches, attr

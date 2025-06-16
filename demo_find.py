@@ -7,6 +7,8 @@ import argparse, pathlib, sys
 from backend.recommend import recommend
 from PIL import Image
 
+
+
 # ------------- CLI ----------------------------------------------------
 p = argparse.ArgumentParser()
 p.add_argument("image", help="query image path")

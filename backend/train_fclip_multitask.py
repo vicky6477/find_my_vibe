@@ -4,7 +4,7 @@ Train five independent linear heads on top of a *frozen* FashionCLIP backbone.
 Heads / labels
 --------------
 style   ← CSV column  `usage`
-item    ← CSV column  `subCategory`
+item    ← CSV column  `articleType`
 gender  ← CSV column  `gender`
 colour  ← CSV column  `baseColour`
 season  ← CSV column  `season`
@@ -18,8 +18,8 @@ Assumptions
 Usage (from repo root)
 ----------------------
 python -m backend.train_fclip_multitask \
-       --csv    data/styles.csv \
-       --imgs   data/fashion_dataset/images \
+       --csv    fashion_dataset/styles.csv \
+       --imgs   fashion_dataset/images \
        --out    checkpoints/fclip_heads_5way.pth \
        --batch  256 --epochs 4 --workers 8
 """
@@ -63,7 +63,7 @@ class FashionCSVDataset(Dataset):
         self.colours  = colours
         self.seasons  = seasons
 
-    def __len__(self):                  # ←  add this
+    def __len__(self):                  
         return len(self.df)
 
     def __getitem__(self, idx):
@@ -110,7 +110,7 @@ def main():
 
     # 4.1  Read CSV and build vocabularies
     df = (pd.read_csv(args.csv,on_bad_lines="skip")
-            .rename(columns={"subCategory":"item_type",
+            .rename(columns={"articleType":"item_type",
                              "usage":"style",
                              "baseColour":"colour"}))
     csv_cols = ["id","style","item_type","gender","colour","season"]

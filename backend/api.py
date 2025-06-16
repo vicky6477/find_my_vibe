@@ -18,6 +18,10 @@ app.add_middleware(
 
 # serve catalogue images and front-end
 app.mount("/fashion-dataset", StaticFiles(directory="fashion_dataset/images"), name="fashion-dataset")
+
+app.mount("/our-dataset",StaticFiles(directory="our_dataset/fashion_images"),       
+name="our-dataset")
+
 app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
 
 @app.get("/")

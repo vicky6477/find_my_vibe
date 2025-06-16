@@ -44,8 +44,8 @@ python3.11 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt          # numpy<2 • torch 2.2.2 • faiss-cpu 1.7.4 …
 
 # 2  one-time: build Faiss index (~8 min CPU, <3 min Apple-Silicon MPS)
-python -m backend.build_index
-
+python -m backend.build_index_5way
+python -m backend.build_index_proj
 # 3  run CLI grid
 python backend/demo_find.py uploads/example.jpg -k 3
 
