@@ -36,7 +36,9 @@ This project starts with FashionCLIP and extends it by:
 
 - Adding five classification heads for attribute prediction (item\_type, gender, color, season, style)
 - Training a new triplet projection head using curated anchor-positive-negative samples
-- Enabling hybrid retrieval: strict same-item match + mix-and-match by style
+- Enabling dual retrieval modes:
+  - **Strict mode** (based on attribute filtering)
+  - **Combo mode** (hybrid logic using triplet-style similarity)
 - Providing a real-time API and user interface with retrieval mode selection
 
 ---
@@ -87,8 +89,12 @@ Then visit: [http://127.0.0.1:8000](http://127.0.0.1:8000)
 
 The frontend lets users choose:
 
-- **Same-item (strict)**: filters by item\_type, color, etc.
-- **Style-combo (mix & match)**: relaxed mode using hybrid embedding similarity
+- **Same-item (strict)** → uses `recommend.py`
+- **Style-combo (mix & match)** → uses `recommend_combo.py`
+
+Displays predicted attributes and top-3 matched results.
+
+---
 
 ## Using the embeddings directly
 
@@ -107,10 +113,11 @@ image_embeddings = fclip.encode_images(images, batch_size=32)
 | 1. Fine-tune FashionCLIP | Added `train_fclip_multitask.py` with 5 heads (style, item\_type, gender, colour, season)   | Enables prediction of item\_type, color, etc.                 | `train_fclip_multitask.py`  |
 | 2. Train Projection Head | New 256-D projection head trained with triplet loss on `our_dataset/`                       | Supports fine-grained visual similarity in custom style space | `train_proj_head.py`        |
 | 3. Embedding + Indexing  | `build_index_5way.py` + `build_index_proj.py` embed and index both head outputs             | Makes both retrieval paths available for querying             | `build_index_*.py`, `data/` |
-| 4. Hybrid Retrieval      | `recommend_combo.py` uses 5-way prediction for filtering, then ranks with triplet embedding | Combines structure-aware filtering and visual similarity      | `recommend_combo.py`        |
-| 5. CLI Demo              | `demo_find.py` prints predictions and visual grid                                           | Easy local testing                                            | `demo_find.py`              |
-| 6. FastAPI + UI          | REST API + HTML frontend with retrieval selector                                            | Makes system user-facing                                      | `api.py`, `index.html`      |
-| 7. Cross-platform Fixes  | POSIX paths, numpy pin, libomp fix, env guards                                              | Ensures reproducibility                                       | `requirements.txt`, etc.    |
+| 4. Strict Retrieval      | `recommend.py` filters candidates based on predicted attributes (hard rules)                | Provides fast and interpretable recommendations               | `recommend.py`              |
+| 5. Hybrid Retrieval      | `recommend_combo.py` uses 5-way prediction for filtering, then ranks with triplet embedding | Combines structure-aware filtering and visual similarity      | `recommend_combo.py`        |
+| 6. CLI Demo              | `demo_find.py` prints predictions and visual grid                                           | Easy local testing                                            | `demo_find.py`              |
+| 7. FastAPI + UI          | REST API + HTML frontend with retrieval selector                                            | Makes system user-facing                                      | `api.py`, `index.html`      |
+| 8. Cross-platform Fixes  | POSIX paths, numpy pin, libomp fix, env guards                                              | Ensures reproducibility                                       | `requirements.txt`, etc.    |
 
 ---
 
@@ -122,13 +129,14 @@ backend/
 ├─ train_proj_head.py          # train custom projection head
 ├─ build_index_5way.py         # classic index build
 ├─ build_index_proj.py         # projection head index
-├─ recommend.py                # 5-way filter matcher
-├─ recommend_combo.py          # hybrid matcher
+├─ recommend.py                # 5-way filter-based strict matcher
+├─ recommend_combo.py          # hybrid matcher with triplet logic
 ├─ api.py                      # FastAPI logic
 frontend/index.html            # UI with retrieval selector
 checkpoints/                   # saved models
 our_dataset/                   # triplet samples + images
 uploads/                       # test images
+data/                          # generated FAISS indices and metadata
 ```
 
 ---
