@@ -6,19 +6,26 @@
 
 ### Contents
 
-1. [Quick-start](#quick-start)
-2. [Overview](#overview)
-3. [Installation](#installation)
-4. [Build the Faiss index](#build-the-faiss-index)
-5. [CLI demo](#cli-demo)
-6. [REST API + UI](#rest-api--ui)
-7. [Using the embeddings directly](#using-the-embeddings-directly)
-8. [What We Changed and Why](#what-we-changed-and-why)
-9. [Project layout](#project-layout)
-10. [Training & Embedding Details](#training--embedding-details)
-11. [Industrial Impact](#industrial-impact)
-12. [Troubleshooting](#troubleshooting)
-13. [Citation](#citation)
+- [🧠 Find-My-Vibe](#-find-my-vibe)
+    - [Contents](#contents)
+  - [Overview](#overview)
+    - [🔍 About FashionCLIP](#-about-fashionclip)
+    - [💡 What *Find-My-Vibe* Builds on Top](#-what-find-my-vibe-builds-on-top)
+  - [Quick-start](#quick-start)
+  - [Installation](#installation)
+  - [Build the Faiss index](#build-the-faiss-index)
+  - [CLI demo](#cli-demo)
+  - [REST API + UI](#rest-api--ui)
+  - [Using the embeddings directly](#using-the-embeddings-directly)
+  - [What We Changed and Why](#what-we-changed-and-why)
+  - [Project layout](#project-layout)
+  - [🧠 Training \& Embedding Details](#-training--embedding-details)
+    - [1. Fashion Attribute Classifier (5-way heads)](#1-fashion-attribute-classifier-5-way-heads)
+    - [2. Triplet Projection Head](#2-triplet-projection-head)
+    - [3. Embedding \& Indexing](#3-embedding--indexing)
+  - [💼 Industrial Impact](#-industrial-impact)
+  - [Troubleshooting](#troubleshooting)
+  - [Citation](#citation)
 
 ---
 
@@ -34,12 +41,13 @@ For more, see [patrickjohncyh/fashion-clip on Hugging Face](https://huggingface.
 
 This project starts with FashionCLIP and extends it by:
 
-- Adding five classification heads for attribute prediction (item\_type, gender, color, season, style)
-- Training a new triplet projection head using curated anchor-positive-negative samples
-- Enabling dual retrieval modes:
-  - **Strict mode** (based on attribute filtering)
-  - **Combo mode** (hybrid logic using triplet-style similarity)
-- Providing a real-time API and user interface with retrieval mode selection
+* Adding five classification heads for attribute prediction (item\_type, gender, color, season, style)
+* Training a new triplet projection head using curated anchor-positive-negative samples
+* Enabling dual retrieval modes:
+
+  * **Strict mode** (based on attribute filtering)
+  * **Combo mode** (hybrid logic using triplet-style similarity)
+* Providing a real-time API and user interface with retrieval mode selection
 
 ---
 
@@ -87,12 +95,17 @@ python main.py
 
 Then visit: [http://127.0.0.1:8000](http://127.0.0.1:8000)
 
-The frontend lets users choose:
+The system supports **two types of input** and **two retrieval modes**:
 
-- **Same-item (strict)** → uses `recommend.py`
-- **Style-combo (mix & match)** → uses `recommend_combo.py`
+* 📷 **Image input**: Upload a fashion item image
 
-Displays predicted attributes and top-3 matched results.
+  * **Strict mode** → filters candidates by predicted attributes (via `recommend.py`)
+  * **Style-combo mode** → hybrid scoring using style embedding + filtering (`recommend_combo.py`)
+
+* 📝 **Text input**: Enter a query such as `"white summer dress"`
+  → Returns visually similar items using CLIP text-image similarity (`recommend_from_text` in `recommend.py`)
+
+You can use either interface to explore relevant fashion matches.
 
 ---
 
@@ -145,39 +158,52 @@ data/                          # generated FAISS indices and metadata
 
 ### 1. Fashion Attribute Classifier (5-way heads)
 
-- Model: ViT-B/32 backbone + 5 linear heads (style, item\_type, gender, colour, season)
-- Loss: CrossEntropyLoss for each head
-- Training data: 31K labeled samples from `styles.csv`
-- Script: [`train_fclip_multitask.py`](backend/train_fclip_multitask.py)
+* Model: ViT-B/32 backbone + 5 linear heads (style, item\_type, gender, colour, season)
+* Loss: CrossEntropyLoss for each head
+* Training data: 31K labeled samples from `styles.csv`
+* Script: [`train_fclip_multitask.py`](backend/train_fclip_multitask.py)
 
 ### 2. Triplet Projection Head
 
-- Model: ViT-B/32 backbone + 256-D projection head
-- Loss: TripletMarginLoss (anchor, positive, negative from `train_triplets.csv`)
-- Dataset: `our_dataset/fashion_images/`
-- Script: [`train_proj_head.py`](backend/train_proj_head.py)
+* Model: ViT-B/32 backbone + 256-D projection head
+* Loss: TripletMarginLoss (anchor, positive, negative from `train_triplets.csv`)
+* Dataset: `our_dataset/fashion_images/`
+* Script: [`train_proj_head.py`](backend/train_proj_head.py)
 
 ### 3. Embedding & Indexing
 
-- Embedding: image → 512-D (CLIP), or 256-D (projection head), normalized with L2 norm
-- Index: FAISS `IndexFlatIP` used for nearest-neighbor search
-- Build scripts:
-  - [`build_index_5way.py`](backend/build_index_5way.py): uses 5-way head
-  - [`build_index_proj.py`](backend/build_index_proj.py): uses projection head
+* Embedding: image → 512-D (CLIP), or 256-D (projection head), normalized with L2 norm
+* Index: FAISS `IndexFlatIP` used for nearest-neighbor search
+* Build scripts:
+
+  * [`build_index_5way.py`](backend/build_index_5way.py): uses 5-way head
+  * [`build_index_proj.py`](backend/build_index_proj.py): uses projection head
 
 ---
 
 ## 💼 Industrial Impact
 
-This system bridges the gap between foundational vision-language models (CLIP) and domain-specific recommendation tasks in fashion e-commerce. It:
+This system demonstrates a scalable **image-based** and **text-based** fashion recommendation pipeline, designed for practical use in fashion e-commerce and personalized retail experiences.
 
-- Supports attribute-aware recommendations for structured search (e.g. "white women's summer dress")
-- Enables flexible outfit discovery through style-combo matching (e.g. "show me items that go well with this top")
-- Offers fast, on-device inference and scalable API integration
+* 📷 **Image-to-Image Retrieval**:
 
-This approach demonstrates how pretrained multi-modal models can be **adapted and extended for commercial use** by combining zero-shot learning, lightweight task-specific heads, and fast retrieval backends like Faiss.
+  * Users upload an image of a fashion item they like.
+  * The system predicts attributes and recommends visually or structurally similar items.
+  * Two retrieval modes:
 
----
+    * **Strict match**: Uses attribute classification and hard filtering (`recommend.py`)
+    * **Style-combo**: Uses hybrid scoring with triplet-based embedding similarity (`recommend_combo.py`)
+
+* 📝 **Text-to-Image Retrieval**:
+
+  * Users enter a text description such as "white summer dress".
+  * The system encodes the text using FashionCLIP’s text encoder and retrieves the most visually matching catalog images (`recommend_from_text`).
+
+* ⚡ Built with FAISS for efficient large-scale retrieval.
+
+* 🛍 Supports applications like visual product search, personal styling, and smart outfit suggestions.
+
+This project extends the original FashionCLIP by adding multi-head classification, triplet-based training, and supporting both image and text input modes—providing a complete and extensible recommendation system.
 
 ## Troubleshooting
 
@@ -203,4 +229,3 @@ This approach demonstrates how pretrained multi-modal models can be **adapted an
     doi="10.1038/s41598-022-23052-9"
 }
 ```
-
