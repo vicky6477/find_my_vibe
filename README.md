@@ -24,6 +24,7 @@
     - [2. Triplet Projection Head](#2-triplet-projection-head)
     - [3. Embedding \& Indexing](#3-embedding--indexing)
   - [💼 Industrial Impact](#-industrial-impact)
+  - [Considering to have:](#considering-to-have)
   - [Troubleshooting](#troubleshooting)
   - [Citation](#citation)
 
@@ -101,11 +102,6 @@ The system supports **two types of input** and **two retrieval modes**:
 
   * **Strict mode** → filters candidates by predicted attributes (via `recommend.py`)
   * **Style-combo mode** → hybrid scoring using style embedding + filtering (`recommend_combo.py`)
-
-* 📝 **Text input**: Enter a query such as `"white summer dress"`
-  → Returns visually similar items using CLIP text-image similarity (`recommend_from_text` in `recommend.py`)
-
-You can use either interface to explore relevant fashion matches.
 
 ---
 
@@ -193,7 +189,8 @@ This system demonstrates a scalable **image-based** and **text-based** fashion r
 
     * **Strict match**: Uses attribute classification and hard filtering (`recommend.py`)
     * **Style-combo**: Uses hybrid scoring with triplet-based embedding similarity (`recommend_combo.py`)
-
+    * 
+## Considering to have:
 * 📝 **Text-to-Image Retrieval**:
 
   * Users enter a text description such as "white summer dress".
