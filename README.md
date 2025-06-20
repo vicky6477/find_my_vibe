@@ -42,8 +42,8 @@ For more, see [patrickjohncyh/fashion-clip on Hugging Face](https://huggingface.
 
 This project starts with FashionCLIP and extends it by:
 
-* Adding five classification heads for attribute prediction (item\_type, gender, color, season, style)
-* Training a new triplet projection head using curated anchor-positive-negative samples
+* Adding five classification heads for attribute prediction (item\_type, gender, color, season, style).
+* Training a new triplet projection head using curated anchor-positive-negative samples using a multi-layer perceptron (MLP) layer for returning items with more consistent and similar style.
 * Enabling dual retrieval modes:
 
   * **Strict mode** (based on attribute filtering)
@@ -130,6 +130,33 @@ image_embeddings = fclip.encode_images(images, batch_size=32)
 
 ---
 
+## Training & Embedding Details
+
+### 1. Fashion Attribute Classifier (5-way heads)
+
+* Model: ViT-B/32 backbone + 5 linear heads (style, item\_type, gender, colour, season)
+* Loss function: CrossEntropyLoss for each head
+* Training data: 31K labeled samples from `styles.csv`
+* Script: [`train_fclip_multitask.py`](backend/train_fclip_multitask.py)
+
+### 2. Triplet Projection Head
+
+* Model: frozen ViT-B/32 backbone from Fashion-CLIP + a MLP layer that outputs normalized 256-D vectors.
+* Loss function: InfoNCE loss for contrasive learning, it encourages the anchor to be closer to the positive than the negative in the embedding space.
+* Training Data: `our_dataset/fashion_images/`
+* Script: [`train_proj_head.py`](backend/train_proj_head.py)
+
+### 3. Embedding & Indexing
+
+* Embedding: image → 512-D (CLIP), or 256-D (projection head), normalized with L2 norm
+* Index: FAISS `IndexFlatIP` used for nearest-neighbor search
+* Build scripts:
+
+  * [`build_index_5way.py`](backend/build_index_5way.py): uses 5-way head
+  * [`build_index_proj.py`](backend/build_index_proj.py): uses projection head
+
+---
+
 ## Project layout
 
 ```
@@ -147,33 +174,6 @@ our_dataset/                   # triplet samples + images
 uploads/                       # test images
 data/                          # generated FAISS indices and metadata
 ```
-
----
-
-## 🧠 Training & Embedding Details
-
-### 1. Fashion Attribute Classifier (5-way heads)
-
-* Model: ViT-B/32 backbone + 5 linear heads (style, item\_type, gender, colour, season)
-* Loss: CrossEntropyLoss for each head
-* Training data: 31K labeled samples from `styles.csv`
-* Script: [`train_fclip_multitask.py`](backend/train_fclip_multitask.py)
-
-### 2. Triplet Projection Head
-
-* Model: ViT-B/32 backbone + 256-D projection head
-* Loss: TripletMarginLoss (anchor, positive, negative from `train_triplets.csv`)
-* Dataset: `our_dataset/fashion_images/`
-* Script: [`train_proj_head.py`](backend/train_proj_head.py)
-
-### 3. Embedding & Indexing
-
-* Embedding: image → 512-D (CLIP), or 256-D (projection head), normalized with L2 norm
-* Index: FAISS `IndexFlatIP` used for nearest-neighbor search
-* Build scripts:
-
-  * [`build_index_5way.py`](backend/build_index_5way.py): uses 5-way head
-  * [`build_index_proj.py`](backend/build_index_proj.py): uses projection head
 
 ---
 
